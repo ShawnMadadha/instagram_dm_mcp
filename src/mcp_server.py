@@ -886,44 +886,87 @@ def mute_conversation(thread_id: str, mute: bool = True) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-   parser = argparse.ArgumentParser()
-   parser.add_argument("--username", type=str, help="Instagram username (can also be set via INSTAGRAM_USERNAME env var)")
-   parser.add_argument("--password", type=str, help="Instagram password (can also be set via INSTAGRAM_PASSWORD env var)")
-   args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--username", type=str, help="Instagram username (also via INSTAGRAM_USERNAME env)")
+    parser.add_argument("--password", type=str, help="Instagram password (also via INSTAGRAM_PASSWORD env)")
+    args = parser.parse_args()
 
-   # Get credentials from environment variables or command line arguments
-   username = args.username or os.getenv("INSTAGRAM_USERNAME")
-   password = args.password or os.getenv("INSTAGRAM_PASSWORD")
+    # Resolve username: CLI arg > env var > current_user.txt written by auth.py
+    # Session files live in the user data dir (per OS user, isolated from
+    # any project checkout). This makes the server account-agnostic: every
+    # OpenSwarm user on every machine resolves the same canonical path
+    # regardless of where mcp_server.py is spawned from.
+    SESSION_DIR = Path.home() / ".instagram_dm_mcp" / "sessions"
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    CURRENT_USER_FILE = SESSION_DIR / "current_user.txt"
 
-   if not username or not password:
-       logger.error("Instagram credentials not provided. Please set INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD environment variables in a .env file, or provide --username and --password arguments.")
-       print("Error: Instagram credentials not provided.")
-       print("Please either:")
-       print("1. Create a .env file with INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD")
-       print("2. Use --username and --password command line arguments")
-       exit(1)
+    # One-shot migration: prior versions wrote these to the repo root. If
+    # an old current_user.txt is still there and the new location is empty,
+    # carry it over so existing setups keep working without a re-sign-in.
+    _LEGACY_ROOT = Path(__file__).parent.parent
+    _legacy_user_file = _LEGACY_ROOT / "current_user.txt"
+    if _legacy_user_file.exists() and not CURRENT_USER_FILE.exists():
+        try:
+            CURRENT_USER_FILE.write_text(_legacy_user_file.read_text())
+            logger.info(f"Migrated current_user.txt to {CURRENT_USER_FILE}")
+        except Exception:
+            pass
 
-   try:
-       logger.info("Attempting to login to Instagram...")
-       
-       # CRITICAL FIX: Session file handling for persistent authentication
-       # Without this, Instagram login hangs due to rate limiting and security measures
-       # Session files allow Instagram to recognize the client and avoid fresh authentication
-       # This prevents the MCP server from hanging after "🚀 Attempting to send DM"
-       SESSION_FILE = Path(f"{username}_session.json")
-       if SESSION_FILE.exists():
-           logger.info(f"Loading existing session from {SESSION_FILE}")
-           client.load_settings(SESSION_FILE)
-       
-       client.login(username, password)
-       
-       # Save session for future use to avoid repeated fresh authentication
-       client.dump_settings(SESSION_FILE)
-       logger.info(f"Session saved to {SESSION_FILE}")
-       
-       logger.info("Successfully logged in to Instagram")
-       mcp.run(transport="stdio")
-   except Exception as e:
-       logger.error(f"Failed to login to Instagram: {str(e)}")
-       print(f"Error: Failed to login to Instagram - {str(e)}")
-       exit(1)
+    username = args.username or os.getenv("INSTAGRAM_USERNAME")
+    if not username and CURRENT_USER_FILE.exists():
+        username = CURRENT_USER_FILE.read_text().strip() or None
+
+    if not username:
+        logger.error("No username provided and no current_user.txt found. Run auth.py via OpenSwarm or `python auth.py` first.")
+        print("Error: no Instagram session — run auth.py first.")
+        exit(1)
+
+    SESSION_FILE = SESSION_DIR / f"{username}_session.json"
+    _legacy_session = _LEGACY_ROOT / f"{username}_session.json"
+    if _legacy_session.exists() and not SESSION_FILE.exists():
+        try:
+            SESSION_FILE.write_bytes(_legacy_session.read_bytes())
+            logger.info(f"Migrated {username} session to {SESSION_FILE}")
+        except Exception:
+            pass
+    password = args.password or os.getenv("INSTAGRAM_PASSWORD")
+
+    try:
+        if SESSION_FILE.exists():
+            logger.info(f"Loading existing session from {SESSION_FILE}")
+            client.load_settings(SESSION_FILE)
+            # Validate. If the saved session still works, skip login() entirely
+            # (login() would re-issue 2FA challenges we can't handle here).
+            try:
+                info = client.account_info()
+                logger.info(f"Session valid for @{info.username}")
+            except Exception as session_err:  # noqa: BLE001
+                logger.warning(f"account_info() probe failed ({session_err}); proceeding with loaded session.")
+                # Instagram's mobile API (i.instagram.com) frequently returns 467
+                # on the user-info endpoint for sessions that originated in a
+                # browser, even when those cookies still authorize other calls.
+                # If a password is available we try a fresh login; otherwise we
+                # trust the loaded session and let actual tool calls surface
+                # any auth issues at use time.
+                if password:
+                    try:
+                        client.login(username, password)
+                        client.dump_settings(SESSION_FILE)
+                    except Exception as login_err:  # noqa: BLE001
+                        logger.warning(f"Fallback login also failed ({login_err}); using loaded session as-is.")
+        else:
+            if not password:
+                logger.error(f"No session at {SESSION_FILE} and no password — run auth.py first.")
+                print("Error: no Instagram session — sign in first.")
+                exit(1)
+            logger.info("No session file; attempting fresh login...")
+            client.login(username, password)
+            client.dump_settings(SESSION_FILE)
+            logger.info(f"Session saved to {SESSION_FILE}")
+
+        logger.info("Successfully authenticated to Instagram")
+        mcp.run(transport="stdio")
+    except Exception as e:
+        logger.error(f"Failed to authenticate to Instagram: {str(e)}")
+        print(f"Error: Failed to authenticate to Instagram - {str(e)}")
+        exit(1)
