@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 import logging
 from pathlib import Path
 
+from rate_limiter import rate_limited
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -27,6 +29,7 @@ mcp = FastMCP(
 
 
 @mcp.tool()
+@rate_limited("dm_send")
 def send_message(username: str, message: str) -> Dict[str, Any]:
     """Send an Instagram direct message to a user by username.
 
@@ -52,6 +55,7 @@ def send_message(username: str, message: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("dm_send")
 def send_photo_message(username: str, photo_path: str) -> Dict[str, Any]:
     """Send a photo via Instagram direct message to a user by username.
 
@@ -83,6 +87,7 @@ def send_photo_message(username: str, photo_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("dm_send")
 def send_video_message(username: str, video_path: str) -> Dict[str, Any]:
     """Send a video via Instagram direct message to a user by username.
 
@@ -113,6 +118,7 @@ def send_video_message(username: str, video_path: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def list_chats(
     amount: int = 20,
     selected_filter: str = "",
@@ -167,6 +173,7 @@ def list_chats(
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def list_messages(thread_id: str, amount: int = 20) -> Dict[str, Any]:
     """Get messages from a specific Instagram Direct Message thread by thread ID, with an optional limit.
 
@@ -212,6 +219,7 @@ def list_messages(thread_id: str, amount: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("modify")
 def mark_message_seen(thread_id: str, message_id: str) -> Dict[str, Any]:
     """Mark a message as seen in a direct message thread.
 
@@ -235,6 +243,7 @@ def mark_message_seen(thread_id: str, message_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def list_pending_chats(amount: int = 20) -> Dict[str, Any]:
     """Get Instagram Direct Message threads (chats) from the user's pending inbox.
 
@@ -251,6 +260,7 @@ def list_pending_chats(amount: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("search")
 def search_threads(query: str) -> Dict[str, Any]:
     """Search Instagram Direct Message threads by username or keyword.
 
@@ -269,6 +279,7 @@ def search_threads(query: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_thread_by_participants(user_ids: List[int]) -> Dict[str, Any]:
     """Get an Instagram Direct Message thread by participant user IDs.
 
@@ -287,6 +298,7 @@ def get_thread_by_participants(user_ids: List[int]) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_thread_details(thread_id: str, amount: int = 20) -> Dict[str, Any]:
     """Get details and messages for a specific Instagram Direct Message thread by thread ID, with an optional message limit.
 
@@ -306,6 +318,7 @@ def get_thread_details(thread_id: str, amount: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_id_from_username(username: str) -> Dict[str, Any]:
     """Get the Instagram user ID for a given username.
 
@@ -327,6 +340,7 @@ def get_user_id_from_username(username: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_username_from_user_id(user_id: str) -> Dict[str, Any]:
     """Get the Instagram username for a given user ID.
 
@@ -348,6 +362,7 @@ def get_username_from_user_id(user_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_info(username: str) -> Dict[str, Any]:
     """Get detailed information about an Instagram user.
 
@@ -384,6 +399,7 @@ def get_user_info(username: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def check_user_online_status(usernames: List[str]) -> Dict[str, Any]:
     """Check the online status of Instagram users.
 
@@ -426,6 +442,7 @@ def check_user_online_status(usernames: List[str]) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("search")
 def search_users(query: str) -> Dict[str, Any]:
     """Search for Instagram users by name or username.
 
@@ -459,6 +476,7 @@ def search_users(query: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_stories(username: str) -> Dict[str, Any]:
     """Get Instagram stories from a user.
 
@@ -503,6 +521,7 @@ def get_user_stories(username: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("like")
 def like_media(media_url: str, like: bool = True) -> Dict[str, Any]:
     """Like or unlike an Instagram post.
 
@@ -536,6 +555,7 @@ def like_media(media_url: str, like: bool = True) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_followers(username: str, count: int = 20) -> Dict[str, Any]:
     """Get followers of an Instagram user.
 
@@ -572,6 +592,7 @@ def get_user_followers(username: str, count: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_following(username: str, count: int = 20) -> Dict[str, Any]:
     """Get users that an Instagram user is following.
 
@@ -608,6 +629,7 @@ def get_user_following(username: str, count: int = 20) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def get_user_posts(username: str, count: int = 12) -> Dict[str, Any]:
     """Get recent posts from an Instagram user.
 
@@ -673,6 +695,7 @@ def _find_message_in_thread(thread_id: str, message_id: str):
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def list_media_messages(thread_id: str, limit: int = 100) -> Dict[str, Any]:
     """List all messages containing media in an Instagram direct message thread.
     Args:
@@ -706,6 +729,7 @@ def list_media_messages(thread_id: str, limit: int = 100) -> Dict[str, Any]:
         }
 
 @mcp.tool()
+@rate_limited("lookup")
 def download_media_from_message(message_id: str, thread_id: str, download_path: str = "./downloads") -> Dict[str, Any]:
     """Download media from a specific Instagram direct message and get the local file path.
     Args:
@@ -745,6 +769,7 @@ def download_media_from_message(message_id: str, thread_id: str, download_path: 
 
 
 @mcp.tool()
+@rate_limited("lookup")
 def download_shared_post_from_message(message_id: str, thread_id: str, download_path: str = "./downloads") -> Dict[str, Any]:
     """Download media from a shared post/reel/clip in a DM message and get the local file path.
     Args:
@@ -807,6 +832,7 @@ def download_shared_post_from_message(message_id: str, thread_id: str, download_
 
 
 @mcp.tool()
+@rate_limited("modify")
 def delete_message(thread_id: str, message_id: str) -> Dict[str, Any]:
     """Delete a message from a direct message thread.
 
@@ -830,6 +856,7 @@ def delete_message(thread_id: str, message_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
+@rate_limited("modify")
 def mute_conversation(thread_id: str, mute: bool = True) -> Dict[str, Any]:
     """Mute or unmute a direct message conversation.
 
